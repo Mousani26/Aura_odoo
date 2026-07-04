@@ -1,0 +1,138 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  EMPLOYEE
+}
+
+enum AttendanceStatus {
+  Present
+  Absent
+  Half_day @map("Half-day")
+  On_Leave @map("On-Leave")
+}
+
+enum LeaveStatus {
+  Pending
+  Approved
+  Rejected
+}
+
+enum PayrollStatus {
+  Pending
+  Paid
+}
+
+model User {
+  id               String   @id @default(uuid())
+  email            String   @unique
+  passwordHash     String
+  role             UserRole @default(EMPLOYEE)
+  employeeId       String?  @unique
+  isEmailVerified  Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  employee         Employee? @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+}
+
+model Employee {
+  id              String         @id
+  userId          String         @unique
+  name            String
+  email           String         @unique
+  phone           String?
+  address         String?
+  jobTitle        String
+  department      String
+  joinDate        DateTime
+  status          String         @default("Active") // e.g., Onboarding, Active, Suspended
+  profilePicture  String?
+  salaryBase      Float          @default(4000)
+  salaryAllowance Float          @default(400)
+  salaryDeduction Float          @default(250)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  
+  user            User?
+  attendance      Attendance[]
+  leaves          LeaveRequest[]
+  payrolls        Payroll[]
+}
+
+model Attendance {
+  id         String           @id @default(uuid())
+  employeeId String
+  date       DateTime         // Format: YYYY-MM-DD
+  checkIn    String?          // HH:MM:SS
+  checkOut   String?          // HH:MM:SS
+  status     AttendanceStatus @default(Present)
+  isApproved Boolean          @default(false)
+  approvedBy String?
+  createdAt  DateTime         @default(now())
+  
+  employee   Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, date])
+}
+
+model LeaveRequest {
+  id         String      @id @default(uuid())
+  employeeId String
+  type       String      // e.g., Sick, Casual, Annual
+  startDate  DateTime
+  endDate    DateTime
+  reason     String
+  status     LeaveStatus @default(Pending)
+  approvedBy String?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  employee   Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+}
+
+model Payroll {
+  id            String        @id @default(uuid())
+  employeeId    String
+  month         String        // e.g., July
+  year          Int
+  base          Float
+  allowance     Float
+  deductions    Float
+  netAmount     Float
+  status        PayrollStatus @default(Pending)
+  transactionId String?
+  payDate       DateTime?
+  createdAt     DateTime      @default(now())
+
+  employee   Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, month, year])
+}
+
+model HRActivity {
+  id           String   @id @default(uuid())
+  employeeId   String
+  employeeName String
+  action       String   // e.g., "Sign In", "Clock In", "Request Leave"
+  details      String
+  timestamp    DateTime @default(now())
+}
+
+model HRNotification {
+  id         String   @id @default(uuid())
+  employeeId String
+  title      String
+  message    String
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
